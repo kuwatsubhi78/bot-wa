@@ -1,0 +1,24 @@
+{
+  "name": "bot-wa-rekap-lembur",
+  "version": "1.0.0",
+  "description": "WhatsApp bot untuk rekap lembur",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "bot",
+    "baileys",
+    "supabase"
+  ],
+  "author": "GitHub Copilot",
+  "license": "MIT",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "@whiskeysockets/baileys": "^6.7.28",
+    "dotenv": "^16.4.1",
+    "node-cron": "^4.0.0",
+    "qrcode-terminal": "^0.12.0"
+  }
+}
