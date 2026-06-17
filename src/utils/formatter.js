@@ -9,11 +9,6 @@ function normalizeText(value) {
 
 function formatCurrency(value) {
   const numericValue = Number(value || 0);
-  return `Rp.${numericValue.toLocaleString("id-ID")}`;
-}
-
-function formatRupiah(value) {
-  const numericValue = Number(value || 0);
   return `Rp${numericValue.toLocaleString("id-ID")}`;
 }
 
@@ -78,7 +73,7 @@ function formatReminderMessage(items, tanggalAwal, tanggalAkhir) {
       item.uraian_pekerjaan || "-",
       `${String(item.jam_mulai || "").trim()}-${String(item.jam_selesai || "").trim()}`,
       `${Number(item.total_jam || 0)} Jam`,
-      formatRupiah(item.uang_lembur || 0),
+      formatCurrency(item.uang_lembur || 0),
     ].join("\n");
   });
 
@@ -102,13 +97,13 @@ function formatReminderMessage(items, tanggalAwal, tanggalAkhir) {
     `${totalJam} Jam`,
     "",
     "TOTAL LEMBUR:",
-    formatRupiah(totalLembur),
+    formatCurrency(totalLembur),
     "",
     "UANG MAKAN:",
-    formatRupiah(totalMakan),
+    formatCurrency(totalMakan),
     "",
     "TOTAL DITERIMA:",
-    formatRupiah(totalDiterima),
+    formatCurrency(totalDiterima),
     "",
     "Silakan dicek kembali.",
   ].join("\n");
@@ -119,7 +114,7 @@ function formatCommandError() {
     "FORMAT SALAH",
     "",
     "Gunakan:",
-    "!tambah tanggal, nama, jam, uraian",
+    "!tambah tanggal, nama, jam_mulai-jam_selesai, uraian",
     "",
     "Contoh:",
     "!tambah 31-05-2026, Kuwat Subhi, 20:00-22:00, Helper",
@@ -130,7 +125,6 @@ module.exports = {
   formatDuration,
   normalizeText,
   formatCurrency,
-  formatRupiah,
   formatDateIndo,
   formatJamRange,
   formatReminderMessage,

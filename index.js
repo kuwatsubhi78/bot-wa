@@ -9,8 +9,8 @@ async function main() {
   console.log("BOT LEMBUR BERJALAN");
 
   initSupabase();
-  await connectWhatsApp();
-  registerCommands();
+  const sock = await connectWhatsApp();
+  registerCommands(sock);
   initScheduler();
 
   setInterval(

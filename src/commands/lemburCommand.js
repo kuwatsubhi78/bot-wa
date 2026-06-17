@@ -1,4 +1,4 @@
-const { calculateOvertime } = require("../utils/calculator");
+const { calculateOvertime, hitungLembur } = require("../utils/calculator");
 const {
   formatDuration,
   normalizeText,
@@ -11,6 +11,7 @@ const {
   ambilLemburPeriode,
   getPeriodRange,
   getPeriodForDate,
+  tambahLembur,
 } = require("../services/lemburService");
 
 function parseTambahCommand(input) {
@@ -75,6 +76,109 @@ function getSenderNumber(payload) {
     payload?.user?.id ||
     ""
   );
+}
+
+function parseTanggalToISO(tanggal) {
+  const match = String(tanggal || "")
+    .trim()
+    .match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+
+  if (!match) {
+    return null;
+  }
+
+  const [, dd, mm, yyyy] = match;
+  const day = Number(dd);
+  const month = Number(mm);
+  const year = Number(yyyy);
+
+  const date = new Date(year, month - 1, day);
+  const isValidDate =
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day;
+
+  if (!isValidDate) {
+    return null;
+  }
+
+  return `${yyyy}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function splitJamRange(jamLembur) {
+  const parts = String(jamLembur || "")
+    .split("-")
+    .map((part) => part.trim());
+
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return null;
+  }
+
+  return { jamMulai: parts[0], jamSelesai: parts[1] };
+}
+
+async function processTambahCommand(parsedTambah, payload) {
+  const { tanggal, nama, jamLembur, uraianPekerjaan } = parsedTambah;
+
+  const tanggalISO = parseTanggalToISO(tanggal);
+  const jamRange = splitJamRange(jamLembur);
+
+  if (!tanggalISO || !jamRange) {
+    return {
+      status: "error",
+      message: formatCommandError(),
+    };
+  }
+
+  const hasil = hitungLembur(jamRange.jamMulai, jamRange.jamSelesai);
+  const nomorWA = getSenderNumber(payload);
+
+  const result = await tambahLembur({
+    nama,
+    nomor_wa: nomorWA,
+    tanggal: tanggalISO,
+    uraian_pekerjaan: uraianPekerjaan,
+    jam_mulai: jamRange.jamMulai,
+    jam_selesai: jamRange.jamSelesai,
+    total_jam: hasil.totalJam,
+    tarif_per_jam: hasil.tarifPerJam,
+    uang_lembur: hasil.uangLembur,
+    uang_makan: hasil.uangMakan,
+    total_diterima: hasil.totalDiterima,
+  });
+
+  if (result.status === "error") {
+    return {
+      status: "error",
+      message: `Gagal menyimpan data lembur: ${result.message}`,
+    };
+  }
+
+  if (result.status === "skipped") {
+    return {
+      status: "error",
+      message: "Gagal menyimpan: Supabase belum dikonfigurasi.",
+    };
+  }
+
+  const message = [
+    "DATA LEMBUR TERSIMPAN",
+    "",
+    `Tanggal : ${formatDateIndo(tanggalISO)}`,
+    `Nama : ${nama}`,
+    `Jam : ${formatJamRange(jamRange.jamMulai, jamRange.jamSelesai)}`,
+    `Uraian : ${uraianPekerjaan}`,
+    "",
+    `Total Jam : ${hasil.totalJam} Jam`,
+    `Uang Lembur : ${formatCurrency(hasil.uangLembur)}`,
+    `Uang Makan : ${formatCurrency(hasil.uangMakan)}`,
+    `Total Diterima : ${formatCurrency(hasil.totalDiterima)}`,
+  ].join("\n");
+
+  return {
+    status: "ok",
+    message,
+  };
 }
 
 function buildRekapMessage(items, tanggalAwal, tanggalAkhir) {
@@ -160,11 +264,7 @@ async function handleLemburCommand(payload) {
   if (textPayload) {
     const parsedTambah = parseTambahCommand(textPayload);
     if (parsedTambah) {
-      const { tanggal, nama, jamLembur, uraianPekerjaan } = parsedTambah;
-      return {
-        status: "ok",
-        message: `Tanggal: ${tanggal}\nNama: ${nama}\nJam: ${jamLembur}\nUraian: ${uraianPekerjaan}`,
-      };
+      return await processTambahCommand(parsedTambah, payload);
     }
 
     if (normalizeText(textPayload).startsWith("!tambah")) {
