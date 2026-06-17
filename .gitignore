@@ -1,3 +1,4 @@
 node_modules/
 .env
 npm-debug.log*
+auth_info_baileys
