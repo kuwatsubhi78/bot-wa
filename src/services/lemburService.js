@@ -22,10 +22,7 @@ function getPeriodForDate(inputDate) {
     }
   }
 
-  return {
-    periodeBulan,
-    periodeTahun,
-  };
+  return { periodeBulan, periodeTahun };
 }
 
 function getPeriodRange(bulan, tahun) {
@@ -49,17 +46,15 @@ function getYearRange(tahun) {
 }
 
 function hitungTotalJam(jamMulai, jamSelesai) {
-  if (!jamMulai || !jamSelesai) {
-    return 0;
-  }
+  if (!jamMulai || !jamSelesai) return 0;
 
   const [mulaiJam, mulaiMenit] = jamMulai.split(":").map(Number);
   const [selesaiJam, selesaiMenit] = jamSelesai.split(":").map(Number);
 
   const mulai = mulaiJam * 60 + mulaiMenit;
   const selesai = selesaiJam * 60 + selesaiMenit;
-
   const diff = selesai - mulai;
+
   return diff > 0 ? diff / 60 : 0;
 }
 
@@ -82,6 +77,7 @@ async function tambahLembur(data) {
 
   const payload = {
     nama: data.nama || "",
+    divisi: data.divisi || "", // ← baru
     nomor_wa: data.nomor_wa || "",
     tanggal,
     uraian_pekerjaan: data.uraian_pekerjaan || "",
@@ -92,6 +88,7 @@ async function tambahLembur(data) {
     uang_lembur: uangLembur,
     uang_makan: uangMakan,
     total_diterima: totalDiterima,
+    is_libur: data.is_libur || false, // ← baru
     periode_bulan: period.periodeBulan,
     periode_tahun: period.periodeTahun,
     created_at: new Date().toISOString(),
@@ -136,12 +133,7 @@ async function ambilLemburBulanan(nomorWA, bulan, tahun) {
     return { status: "error", message: error.message };
   }
 
-  return {
-    status: "ok",
-    data,
-    tanggalAwal,
-    tanggalAkhir,
-  };
+  return { status: "ok", data, tanggalAwal, tanggalAkhir };
 }
 
 async function ambilLemburPeriode(nomorWA, bulan, tahun) {
@@ -173,12 +165,7 @@ async function ambilLemburPeriodeSemua(bulan, tahun) {
     return { status: "error", message: error.message };
   }
 
-  return {
-    status: "ok",
-    data,
-    tanggalAwal,
-    tanggalAkhir,
-  };
+  return { status: "ok", data, tanggalAwal, tanggalAkhir };
 }
 
 async function ambilRekapTahunan(nomorWA, tahun) {
@@ -225,12 +212,7 @@ async function ambilRekapTahunan(nomorWA, tahun) {
     summary[key].jumlah_data += 1;
   }
 
-  return {
-    status: "ok",
-    data: summary,
-    tanggalAwal,
-    tanggalAkhir,
-  };
+  return { status: "ok", data: summary, tanggalAwal, tanggalAkhir };
 }
 
 module.exports = {
