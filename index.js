@@ -4,11 +4,13 @@ const { initSupabase } = require("./src/config/supabase");
 const { connectWhatsApp } = require("./src/whatsapp/connection");
 const { registerCommands } = require("./src/commands");
 const { initScheduler } = require("./src/scheduler/reminder");
+const { startQrServer } = require("./src/server/qrServer");
 
 async function main() {
   console.log("BOT LEMBUR BERJALAN");
 
   initSupabase();
+  startQrServer(process.env.PORT || 3000);
   const sock = await connectWhatsApp();
   registerCommands(sock);
   initScheduler();

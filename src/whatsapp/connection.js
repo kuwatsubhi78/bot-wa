@@ -1,3 +1,5 @@
+const { setLatestQR } = require("../server/qrServer");
+
 const {
   default: makeWASocket,
   useMultiFileAuthState,
@@ -89,6 +91,7 @@ async function connectWhatsApp() {
         if (qr) {
           console.log("QR WhatsApp muncul, silakan scan.");
           qrcode.generate(qr, { small: true });
+          setLatestQR(qr);
         }
 
         if (connection === "open") {
