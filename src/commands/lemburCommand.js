@@ -180,6 +180,7 @@ async function processTambahCommand(parsedTambah, payload) {
   }
 
   const lines = [
+    "FORMAT LEMBUR",
     "",
     `Tanggal  : ${formatDateIndo(tanggalISO)}`,
     `Nama     : ${nama}`,
