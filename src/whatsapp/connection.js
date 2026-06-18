@@ -1,4 +1,6 @@
 const { setLatestQR, setConnected } = require("../server/qrServer");
+const fs = require("fs");
+const path = require("path");
 
 const {
   default: makeWASocket,
@@ -16,8 +18,6 @@ let reconnectTimer = null;
 let isConnecting = false;
 
 const RECONNECT_DELAY = 5000;
-
-// Waktu maksimum menunggu QR di-scan sebelum reconnect (3 menit)
 const QR_SCAN_TIMEOUT = 3 * 60 * 1000;
 
 let qrTimeoutTimer = null;
@@ -56,16 +56,27 @@ function scheduleReconnect(label) {
   }
 }
 
+// Hapus folder auth_info_baileys agar QR muncul lagi
+function clearAuthSession() {
+  const authDir = path.resolve("auth_info_baileys");
+  try {
+    if (fs.existsSync(authDir)) {
+      fs.rmSync(authDir, { recursive: true, force: true });
+      console.log("[WA] Sesi lama dihapus, akan minta QR baru.");
+    }
+  } catch (err) {
+    console.error("[WA] Gagal hapus sesi:", err.message);
+  }
+}
+
 // ====================================================================
 // connectWhatsApp
 // ====================================================================
 async function connectWhatsApp() {
-  // Jika sudah konek, langsung kembalikan socket
   if (sock?.user?.id) {
     return sock;
   }
 
-  // Hindari dua proses connect berjalan bersamaan
   if (isConnecting) {
     console.log("[WA] Sudah dalam proses connecting, tunggu...");
     return new Promise((resolve, reject) => {
@@ -88,9 +99,6 @@ async function connectWhatsApp() {
   isConnecting = true;
   clearReconnectTimer();
 
-  // ====================================================================
-  // Buat socket baru
-  // ====================================================================
   const { state, saveCreds } = await useMultiFileAuthState("auth_info_baileys");
   const { version } = await fetchLatestBaileysVersion();
 
@@ -106,12 +114,8 @@ async function connectWhatsApp() {
     retryRequestDelayMs: 2000,
   });
 
-  // Selalu daftarkan ulang creds.update pada setiap socket baru
   sock.ev.on("creds.update", saveCreds);
 
-  // ====================================================================
-  // Bungkus dalam Promise agar caller bisa await sampai "open"
-  // ====================================================================
   return new Promise((resolve, reject) => {
     sock.ev.on("connection.update", (update) => {
       const { connection, lastDisconnect, qr } = update;
@@ -125,7 +129,6 @@ async function connectWhatsApp() {
         qrcode.generate(qr, { small: true });
         setLatestQR(qr);
 
-        // Reset timer setiap kali QR baru muncul (WA refresh QR tiap ~20 detik)
         clearQrTimeout();
         qrTimeoutTimer = setTimeout(() => {
           console.log("[WA] QR tidak di-scan dalam 3 menit, reconnect...");
@@ -158,24 +161,27 @@ async function connectWhatsApp() {
         const isRestartRequired = statusCode === 515;
 
         if (isLoggedOut) {
+          // Hapus sesi lama lalu reconnect otomatis — tidak perlu restart pod
           console.log(
-            "[WA] Sesi logout — hapus auth_info_baileys lalu restart bot.",
+            "[WA] Sesi tidak valid (401/logout) — hapus sesi dan minta QR baru...",
           );
           sock = null;
           isConnecting = false;
-          reject(new Error("WhatsApp logout — scan QR ulang."));
+          clearAuthSession();
+          scheduleReconnect("Sesi logout, QR baru");
+          reject(new Error("Koneksi ditutup (logout), sedang reconnect..."));
           return;
         }
 
         if (isReplaced) {
-          console.log("[WA] Koneksi digantikan device lain.");
+          console.log("[WA] Koneksi digantikan device lain — reconnect...");
           sock = null;
           isConnecting = false;
-          reject(new Error("Koneksi digantikan device lain."));
+          scheduleReconnect("Koneksi digantikan");
+          reject(new Error("Koneksi ditutup (replaced), sedang reconnect..."));
           return;
         }
 
-        // Semua kasus lain (termasuk error 515) → reconnect otomatis
         sock = null;
         isConnecting = false;
 
@@ -192,7 +198,6 @@ async function connectWhatsApp() {
       }
     });
   }).catch((err) => {
-    // Kalau error bukan fatal (hanya "sedang reconnect"), tunggu sampai reconnect selesai
     if (err.message.startsWith("Koneksi ditutup")) {
       return new Promise((resolve, reject) => {
         const check = setInterval(() => {

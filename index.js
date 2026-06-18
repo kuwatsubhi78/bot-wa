@@ -7,35 +7,21 @@ const { initScheduler } = require("./src/scheduler/reminder");
 const { startQrServer } = require("./src/server/qrServer");
 
 // ====================================================================
-// Coba connect dengan retry loop agar bot tidak mati permanen
+// Retry loop tanpa batas — bot tidak boleh mati di Northflank free
 // ====================================================================
-async function connectWithRetry(maxRetries = 10) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+async function connectWithRetry() {
+  let attempt = 0;
+  while (true) {
+    attempt++;
     try {
-      console.log(
-        `[Main] Mencoba connect WhatsApp (percobaan ${attempt}/${maxRetries})...`,
-      );
+      console.log(`[Main] Mencoba connect WhatsApp (percobaan ${attempt})...`);
       const sock = await connectWhatsApp();
       return sock;
     } catch (err) {
-      const isFatal =
-        err.message.includes("logout") ||
-        err.message.includes("digantikan device lain");
-
-      if (isFatal) {
-        console.error("[Main] Error fatal, bot berhenti:", err.message);
-        process.exit(1);
-      }
-
-      if (attempt < maxRetries) {
-        const delay = Math.min(5000 * attempt, 30000); // backoff maks 30 detik
-        console.log(
-          `[Main] Gagal connect (${err.message}), coba lagi dalam ${delay / 1000}s...`,
-        );
-        await new Promise((r) => setTimeout(r, delay));
-      } else {
-        throw new Error(`Gagal connect setelah ${maxRetries} percobaan.`);
-      }
+      const delay = Math.min(5000 * attempt, 30000); // backoff maks 30 detik
+      console.log(`[Main] Gagal connect: ${err.message}`);
+      console.log(`[Main] Coba lagi dalam ${delay / 1000} detik...`);
+      await new Promise((r) => setTimeout(r, delay));
     }
   }
 }
@@ -51,7 +37,6 @@ async function main() {
   registerCommands(sock);
   initScheduler();
 
-  // Heartbeat log setiap 30 menit
   setInterval(
     () => {
       console.log("[Main] Bot masih hidup ✓");
@@ -61,6 +46,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error("[Main] Gagal menjalankan bot:", error.message);
-  process.exit(1);
+  console.error("[Main] Error tak terduga:", error.message);
+  // Tidak process.exit — biarkan platform restart sendiri jika perlu
 });
