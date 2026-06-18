@@ -32,18 +32,15 @@ function parseTambahCommand(input) {
   const rawArgs = commandText.replace(/^!tambah\s*/i, "");
   const parts = rawArgs.split(",").map((part) => part.trim());
 
-  // Minimal 5 bagian: tanggal, nama, divisi, jam, uraian
   if (parts.length < 5) {
     return null;
   }
 
   const [tanggal, nama, divisi, jamLembur, ...rest] = parts;
 
-  // Cek apakah bagian terakhir adalah flag "libur"
   const lastPart = rest[rest.length - 1]?.toLowerCase().trim();
   const isLibur = lastPart === "libur";
 
-  // Uraian adalah semua bagian setelah jam, kecuali flag "libur"
   const uraianParts = isLibur ? rest.slice(0, -1) : rest;
   const uraianPekerjaan = uraianParts.join(", ").trim();
 
@@ -130,9 +127,6 @@ function splitJamRange(jamLembur) {
   return { jamMulai: parts[0], jamSelesai: parts[1] };
 }
 
-// ====================================================================
-// Format jam: "04:00" → "04.00"
-// ====================================================================
 function formatJamTitik(jam) {
   return String(jam || "").replace(":", ".");
 }
@@ -150,9 +144,8 @@ async function processTambahCommand(parsedTambah, payload) {
   if (!tanggalISO || !jamRange) {
     return {
       status: "error",
-      message: formatCommandError
-        ? formatCommandError()
-        : "Format salah.\nContoh:\n!tambah 24-05-2026, Nama, Divisi, 08:00-10:00, uraian\nTambah flag *libur* di akhir jika hari libur.",
+      message:
+        "Format salah.\nContoh:\n!tambah 24-05-2026, Nama, Divisi, 08:00-10:00, uraian\nTambah flag *libur* di akhir jika hari libur.",
     };
   }
 
@@ -186,21 +179,23 @@ async function processTambahCommand(parsedTambah, payload) {
     };
   }
 
-  const jamAsli = hasil.isLibur ? hasil.totalJam / 2 : hasil.totalJam;
-
   const lines = [
-    "✅ DATA LEMBUR TERSIMPAN",
+    "DATA LEMBUR TERSIMPAN",
     "",
-    `Tanggal  : ${formatDateIndo(tanggalISO)}${isLibur ? " *(Hari Libur)*" : ""}`,
+    `Tanggal  : ${formatDateIndo(tanggalISO)}`,
     `Nama     : ${nama}`,
     `Divisi   : ${divisi}`,
-    `Jam      : ${formatJamTitik(jamRange.jamMulai)}-${formatJamTitik(jamRange.jamSelesai)} (${jamAsli} jam${isLibur ? ` × 2 = ${hasil.totalJam} jam` : ""})`,
+    `Jam      : ${formatJamTitik(jamRange.jamMulai)}-${formatJamTitik(jamRange.jamSelesai)}`,
     `Uraian   : ${uraianPekerjaan}`,
     "",
-    `Uang Lembur : ${formatCurrency(hasil.uangLembur)}`,
-    `Uang Makan  : ${formatCurrency(hasil.uangMakan)}`,
-    `Total       : ${formatCurrency(hasil.totalDiterima)}`,
+    `Uang Lembur : ${hasil.totalJam} jam x ${formatCurrency(TARIF_PER_JAM)} = ${formatCurrency(hasil.uangLembur)}`,
   ];
+
+  if (hasil.uangMakan > 0) {
+    lines.push(`Uang Makan  : ${formatCurrency(hasil.uangMakan)}`);
+  }
+
+  lines.push(`Total       : ${formatCurrency(hasil.totalDiterima)}`);
 
   return { status: "ok", message: lines.join("\n") };
 }
@@ -234,8 +229,7 @@ function buildRekapMessage(items, tanggalAwal, tanggalAkhir) {
   const baris = items.map((item, idx) => {
     const jamMulai = formatJamTitik(item.jam_mulai);
     const jamSelesai = formatJamTitik(item.jam_selesai);
-    const libur = item.is_libur ? " *(libur)*" : "";
-    return `${idx + 1}. ${formatDateIndo(item.tanggal)}_${jamMulai}-${jamSelesai}_${Number(item.total_jam || 0)} Jam_${item.uraian_pekerjaan}${libur}`;
+    return `${idx + 1}. ${formatDateIndo(item.tanggal)}_${jamMulai}-${jamSelesai}_${Number(item.total_jam || 0)} Jam_${item.uraian_pekerjaan}`;
   });
 
   const lines = [
@@ -246,9 +240,15 @@ function buildRekapMessage(items, tanggalAwal, tanggalAkhir) {
     ...baris,
     "",
     `Total Jam : ${totalJam} Jam × ${formatCurrency(TARIF_PER_JAM)} = ${formatCurrency(totalUangLembur)}`,
-    `Uang Makan : ${formatCurrency(6000)} × ${jumlahMakan} = ${formatCurrency(totalUangMakan)}`,
-    `TOTAL : ${formatCurrency(totalDiterima)}`,
   ];
+
+  if (jumlahMakan > 0) {
+    lines.push(
+      `Uang Makan : ${formatCurrency(6000)} × ${jumlahMakan} = ${formatCurrency(totalUangMakan)}`,
+    );
+  }
+
+  lines.push(`TOTAL : ${formatCurrency(totalDiterima)}`);
 
   return lines.join("\n");
 }
@@ -316,7 +316,7 @@ async function handleLemburCommand(payload) {
 
   return {
     status: "ok",
-    message: `Rekap lembur: ${formatDuration ? formatDuration(jamLembur) : jamLembur} jam dengan total ${total}`,
+    message: `Rekap lembur: ${jamLembur} jam dengan total ${total}`,
   };
 }
 
