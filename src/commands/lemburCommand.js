@@ -180,11 +180,9 @@ async function processTambahCommand(parsedTambah, payload) {
   }
 
   const lines = [
-    "DATA LEMBUR TERSIMPAN",
     "",
     `Tanggal  : ${formatDateIndo(tanggalISO)}`,
     `Nama     : ${nama}`,
-    `Divisi   : ${divisi}`,
     `Jam      : ${formatJamTitik(jamRange.jamMulai)}-${formatJamTitik(jamRange.jamSelesai)}`,
     `Uraian   : ${uraianPekerjaan}`,
     "",
