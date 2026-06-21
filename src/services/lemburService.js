@@ -218,13 +218,19 @@ async function ambilRekapTahunan(nomorWA, tahun) {
 // ====================================================================
 // Karyawan
 // ====================================================================
-async function cariKaryawan(nomorWaJid) {
+async function cariKaryawan(nomorWa) {
   if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  // strip suffix apapun sebelum lookup
+  const nomorPolos = String(nomorWa)
+    .replace(/@.*$/, "")
+    .replace(/:.*$/, "")
+    .trim();
 
   const { data, error } = await supabase
     .from("karyawan")
     .select("*")
-    .eq("nomor_wa", nomorWaJid)
+    .eq("nomor_wa", nomorPolos)
     .maybeSingle();
 
   if (error) return { status: "error", message: error.message };
