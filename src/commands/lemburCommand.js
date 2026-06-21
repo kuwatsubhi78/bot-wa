@@ -394,7 +394,8 @@ async function processDaftarCommand(payload) {
   const jidAsli = getSenderJid(payload);
 
   if (isAdminSender(payload)) {
-    const result = await daftarkanKaryawan(nomorWa, nama, divisi);
+    const jidAsli = getSenderJid(payload);
+    const result = await daftarkanKaryawan(nomorWa, jidAsli, nama, divisi);
     if (result.status !== "ok") {
       return {
         status: "error",
