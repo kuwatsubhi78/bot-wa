@@ -215,6 +215,137 @@ async function ambilRekapTahunan(nomorWA, tahun) {
   return { status: "ok", data: summary, tanggalAwal, tanggalAkhir };
 }
 
+// ====================================================================
+// Karyawan
+// ====================================================================
+async function cariKaryawan(nomorWaJid) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { data, error } = await supabase
+    .from("karyawan")
+    .select("*")
+    .eq("nomor_wa", nomorWaJid)
+    .maybeSingle();
+
+  if (error) return { status: "error", message: error.message };
+  if (!data) return { status: "not_found" };
+  return { status: "ok", data };
+}
+
+async function daftarkanKaryawan(nomorWa, jid, nama, divisi) {
+  const nomorPolos = String(nomorWa)
+    .replace(/@.*$/, "")
+    .replace(/:.*$/, "")
+    .trim();
+
+  const { data, error } = await supabase
+    .from("karyawan")
+    .upsert([{ nomor_wa: nomorPolos, jid: jid || "", nama, divisi }], {
+      onConflict: "nomor_wa",
+    })
+    .select()
+    .single();
+
+  if (error) return { status: "error", message: error.message };
+  return { status: "ok", data };
+}
+
+// ====================================================================
+// Kode pekerjaan
+// ====================================================================
+async function ambilSemuaKodePekerjaan() {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { data, error } = await supabase
+    .from("kode_pekerjaan")
+    .select("*")
+    .order("kode", { ascending: true });
+
+  if (error) return { status: "error", message: error.message };
+  return { status: "ok", data: data || [] };
+}
+
+// ====================================================================
+// Hapus & edit lembur
+// ====================================================================
+async function ambilLemburById(id) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { data, error } = await supabase
+    .from("lembur")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return { status: "error", message: error.message };
+  if (!data) return { status: "not_found" };
+  return { status: "ok", data };
+}
+
+async function hapusLemburById(id) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { error } = await supabase.from("lembur").delete().eq("id", id);
+  if (error) return { status: "error", message: error.message };
+  return { status: "ok" };
+}
+
+async function updateLemburById(id, updateData) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { data, error } = await supabase
+    .from("lembur")
+    .update(updateData)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) return { status: "error", message: error.message };
+  return { status: "ok", data };
+}
+
+async function tambahPendaftaran(nomorWa, jid, nama, divisi) {
+  const nomorPolos = String(nomorWa)
+    .replace(/@.*$/, "")
+    .replace(/:.*$/, "")
+    .trim();
+
+  const { data, error } = await supabase
+    .from("pendaftaran")
+    .insert([{ nomor_wa: nomorPolos, jid, nama, divisi }])
+    .select()
+    .single();
+
+  if (error) return { status: "error", message: error.message };
+  return { status: "ok", data };
+}
+
+async function ambilPendaftaranById(id) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { data, error } = await supabase
+    .from("pendaftaran")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) return { status: "error", message: error.message };
+  if (!data) return { status: "not_found" };
+  return { status: "ok", data };
+}
+
+async function updateStatusPendaftaran(id, status) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { error } = await supabase
+    .from("pendaftaran")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) return { status: "error", message: error.message };
+  return { status: "ok" };
+}
+
 module.exports = {
   tambahLembur,
   ambilLemburBulanan,
@@ -223,4 +354,13 @@ module.exports = {
   ambilRekapTahunan,
   getPeriodRange,
   getPeriodForDate,
+  cariKaryawan,
+  daftarkanKaryawan,
+  ambilSemuaKodePekerjaan,
+  ambilLemburById,
+  hapusLemburById,
+  updateLemburById,
+  tambahPendaftaran,
+  ambilPendaftaranById,
+  updateStatusPendaftaran,
 };
