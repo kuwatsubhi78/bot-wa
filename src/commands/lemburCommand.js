@@ -10,6 +10,7 @@ const {
 } = require("../utils/formatter");
 const {
   ambilLemburPeriode,
+  ambilLemburPeriodeSemua,
   getPeriodRange,
   getPeriodForDate,
   tambahLembur,
@@ -23,7 +24,7 @@ const {
   ambilPendaftaranById,
   updateStatusPendaftaran,
 } = require("../services/lemburService");
-const { sendTextMessage } = require("../whatsapp/sender");
+const { sendTextMessage, sendDocumentMessage } = require("../whatsapp/sender");
 
 // ====================================================================
 // Konstanta
@@ -176,6 +177,7 @@ function buildMenuMessage(isAdmin, payload = null) {
       "!kode",
       "!hapus [id]",
       "!edit [id], jam, uraian",
+      "!export [bulan] [tahun]      — export CSV rekap semua karyawan",
     );
   }
 
@@ -195,9 +197,7 @@ function setSock(sock) {
 }
 
 async function kirimKeAdmin(message) {
-  if (!sockGlobal) {
-    return;
-  }
+  if (!sockGlobal) return;
 
   const adminNumbers = String(process.env.ADMIN_NUMBERS || "")
     .split(",")
@@ -207,11 +207,11 @@ async function kirimKeAdmin(message) {
   for (const nomor of adminNumbers) {
     try {
       await sendTextMessage(sockGlobal, `${nomor}@lid`, message);
-    } catch (e1) {
+    } catch {
       try {
         await sendTextMessage(sockGlobal, `${nomor}@s.whatsapp.net`, message);
-      } catch (e2) {
-        // console.log("[kirimKeAdmin] gagal @s.whatsapp.net:", e2.message);
+      } catch {
+        // gagal kirim ke admin
       }
     }
   }
@@ -220,18 +220,15 @@ async function kirimKeAdmin(message) {
 async function kirimKeKaryawan(jidAtauNomor, message) {
   if (!sockGlobal) return;
 
-  // kalau sudah ada @, pakai langsung. kalau nomor polos, coba dua format
   if (jidAtauNomor.includes("@")) {
     try {
       await sendTextMessage(sockGlobal, jidAtauNomor, message);
-      // console.log("[kirimKeKaryawan] berhasil kirim ke", jidAtauNomor);
-    } catch (e) {
-      // console.log("[kirimKeKaryawan] gagal:", e.message);
+    } catch {
+      // gagal kirim
     }
     return;
   }
 
-  // nomor polos — coba @lid dulu
   try {
     await sendTextMessage(sockGlobal, `${jidAtauNomor}@lid`, message);
   } catch {
@@ -241,10 +238,52 @@ async function kirimKeKaryawan(jidAtauNomor, message) {
         `${jidAtauNomor}@s.whatsapp.net`,
         message,
       );
-    } catch (e) {
-      // console.log("[kirimKeKaryawan] gagal semua format:", e.message);
+    } catch {
+      // gagal semua format
     }
   }
+}
+
+// ====================================================================
+// Build CSV
+// ====================================================================
+function buildCSV(items) {
+  const header = [
+    "ID",
+    "Tanggal",
+    "Nama",
+    "Divisi",
+    "Nomor WA",
+    "Jam Mulai",
+    "Jam Selesai",
+    "Total Jam",
+    "Uraian Pekerjaan",
+    "Uang Lembur",
+    "Uang Makan",
+    "Total Diterima",
+    "Hari Libur",
+  ].join(",");
+
+  const rows = items.map((item) => {
+    const cols = [
+      item.id,
+      item.tanggal,
+      `"${(item.nama || "").replace(/"/g, '""')}"`,
+      `"${(item.divisi || "").replace(/"/g, '""')}"`,
+      item.nomor_wa,
+      item.jam_mulai || "",
+      item.jam_selesai || "",
+      item.total_jam || 0,
+      `"${(item.uraian_pekerjaan || "").replace(/"/g, '""')}"`,
+      item.uang_lembur || 0,
+      item.uang_makan || 0,
+      item.total_diterima || 0,
+      item.is_libur ? "Ya" : "Tidak",
+    ];
+    return cols.join(",");
+  });
+
+  return [header, ...rows].join("\n");
 }
 
 // ====================================================================
@@ -271,11 +310,13 @@ async function requireKaryawan(payload) {
   return { ok: true, karyawan: result.data };
 }
 
+// ====================================================================
+// !daftar
+// ====================================================================
 async function processDaftarCommand(payload) {
   const text = normalizeText(payload?.text || "");
 
   const cek = await cariKaryawan(getSenderNumber(payload));
-
   if (cek.status === "ok") {
     return {
       status: "ok",
@@ -288,7 +329,6 @@ async function processDaftarCommand(payload) {
     .replace(/^!daftar\s*/i, "")
     .split(",")
     .map((p) => p.trim());
-
   if (args.length < 2 || !args[0] || !args[1]) {
     return {
       status: "error",
@@ -315,14 +355,7 @@ async function processDaftarCommand(payload) {
     };
   }
 
-  // console.log("[daftar] bukan admin, simpan ke pendaftaran...");
   const result = await tambahPendaftaran(nomorWa, jidAsli, nama, divisi);
-  // console.log(
-  //   "[daftar] hasil tambahPendaftaran:",
-  //   result.status,
-  //   result.message || "",
-  // );
-
   if (result.status !== "ok") {
     return {
       status: "error",
@@ -330,7 +363,6 @@ async function processDaftarCommand(payload) {
     };
   }
 
-  // console.log("[daftar] kirim notif ke admin...");
   await kirimKeAdmin(
     `📋 *PERMINTAAN PENDAFTARAN*\n\nID Request : ${result.data.id}\nNomor      : ${nomorWa}\nNama       : ${nama}\nDivisi     : ${divisi}\n\nKetik *!setujui ${result.data.id}* untuk menyetujui.`,
   );
@@ -893,7 +925,7 @@ async function handleLemburCommand(payload) {
     return {
       status: "ok",
       message:
-        "🔓 Mode admin aktif. Berlaku 30 menit.\n\nCommand admin tersedia:\n!kode\n!hapus [id]\n!edit [id], jam, uraian\n!daftarkaryawan\n!setujui [id]",
+        "🔓 Mode admin aktif. Berlaku 30 menit.\n\nCommand admin tersedia:\n!kode\n!hapus [id]\n!edit [id], jam, uraian\n!daftarkaryawan\n!setujui [id]\n!export [bulan] [tahun]",
     };
   }
 
@@ -1004,6 +1036,81 @@ async function handleLemburCommand(payload) {
       message:
         "Format salah.\nContoh:\n!edit 42, 08:00-10:00, uraian pekerjaan baru",
     };
+  }
+
+  // ---- !export ----
+  if (lower.startsWith("!export")) {
+    if (!isAdminActive(payload)) {
+      return {
+        status: "error",
+        message: "Aktifkan mode admin dulu dengan *!adminon [kode]*",
+      };
+    }
+
+    const args = lower
+      .replace(/^!export\s*/i, "")
+      .split(/\s+/)
+      .filter(Boolean);
+    let bulan, tahun;
+
+    if (args.length === 2) {
+      bulan = Number(args[0]);
+      tahun = Number(args[1]);
+    } else {
+      const now = nowWIB();
+      const period = getPeriodForDate(now);
+      bulan = period.periodeBulan;
+      tahun = period.periodeTahun;
+    }
+
+    if (
+      !Number.isFinite(bulan) ||
+      !Number.isFinite(tahun) ||
+      bulan < 1 ||
+      bulan > 12
+    ) {
+      return {
+        status: "error",
+        message: "Format salah.\nContoh:\n!export\n!export 6 2026",
+      };
+    }
+
+    const { tanggalAwal, tanggalAkhir } = getPeriodRange(bulan, tahun);
+    const result = await ambilLemburPeriodeSemua(bulan, tahun);
+
+    if (result.status !== "ok") {
+      return {
+        status: "error",
+        message: `Gagal mengambil data: ${result.message}`,
+      };
+    }
+
+    const items = result.data || [];
+    if (items.length === 0) {
+      return {
+        status: "ok",
+        message: "Tidak ada data lembur pada periode ini.",
+      };
+    }
+
+    const csvString = buildCSV(items);
+    const buffer = Buffer.from("\uFEFF" + csvString, "utf-8");
+    const fileName = `rekap-lembur-${formatDateIndo(tanggalAwal).replace(/\s/g, "")}-${formatDateIndo(tanggalAkhir).replace(/\s/g, "")}.csv`;
+
+    if (!sockGlobal) {
+      return { status: "error", message: "Koneksi WA belum siap." };
+    }
+
+    const senderJid = getSenderJid(payload);
+    try {
+      await sendDocumentMessage(sockGlobal, senderJid, buffer, fileName);
+      return {
+        status: "ok",
+        message: `✅ File CSV terkirim.\nPeriode : ${formatDateIndo(tanggalAwal)} - ${formatDateIndo(tanggalAkhir)}\nJumlah data : ${items.length} baris`,
+      };
+    } catch (e) {
+      return { status: "error", message: `Gagal kirim file: ${e.message}` };
+    }
   }
 
   // ---- Tidak dikenali ----
