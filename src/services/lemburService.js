@@ -352,6 +352,23 @@ async function updateStatusPendaftaran(id, status) {
   return { status: "ok" };
 }
 
+async function ambilJidKaryawan(nomorWa) {
+  if (!supabase) return null;
+
+  const nomorPolos = String(nomorWa)
+    .replace(/@.*$/, "")
+    .replace(/:.*$/, "")
+    .trim();
+
+  const { data } = await supabase
+    .from("karyawan")
+    .select("jid")
+    .eq("nomor_wa", nomorPolos)
+    .maybeSingle();
+
+  return data?.jid || null;
+}
+
 module.exports = {
   tambahLembur,
   ambilLemburBulanan,
@@ -369,4 +386,5 @@ module.exports = {
   tambahPendaftaran,
   ambilPendaftaranById,
   updateStatusPendaftaran,
+  ambilJidKaryawan,
 };

@@ -109,18 +109,6 @@ function formatReminderMessage(items, tanggalAwal, tanggalAkhir) {
   ].join("\n");
 }
 
-function formatCommandError() {
-  return [
-    "FORMAT SALAH",
-    "",
-    "Gunakan:",
-    "!tambah tanggal, nama, jam_mulai-jam_selesai, uraian",
-    "",
-    "Contoh:",
-    "!tambah 31-05-2026, Kuwat Subhi, 20:00-22:00, Helper",
-  ].join("\n");
-}
-
 module.exports = {
   formatDuration,
   normalizeText,
@@ -128,5 +116,4 @@ module.exports = {
   formatDateIndo,
   formatJamRange,
   formatReminderMessage,
-  formatCommandError,
 };

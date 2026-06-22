@@ -114,6 +114,12 @@ function todayISO() {
   return `${wib.getUTCFullYear()}-${String(wib.getUTCMonth() + 1).padStart(2, "0")}-${String(wib.getUTCDate()).padStart(2, "0")}`;
 }
 
+function yesterdayISO() {
+  const wib = nowWIB();
+  wib.setUTCDate(wib.getUTCDate() - 1);
+  return `${wib.getUTCFullYear()}-${String(wib.getUTCMonth() + 1).padStart(2, "0")}-${String(wib.getUTCDate()).padStart(2, "0")}`;
+}
+
 // ====================================================================
 // Helpers jam
 // ====================================================================
@@ -188,29 +194,8 @@ function setSock(sock) {
   sockGlobal = sock;
 }
 
-// async function kirimKeAdmin(message) {
-//   if (!sockGlobal) return;
-//   const adminNumbers = String(process.env.ADMIN_NUMBERS || "")
-//     .split(",")
-//     .map((n) => n.trim())
-//     .filter(Boolean);
-
-//   for (const nomor of adminNumbers) {
-//     try {
-//       await sendTextMessage(sockGlobal, `${nomor}@s.whatsapp.net`, message);
-//     } catch {
-//       try {
-//         await sendTextMessage(sockGlobal, `${nomor}@lid`, message);
-//       } catch {
-//         // gagal kirim ke admin
-//       }
-//     }
-//   }
-// }
-
 async function kirimKeAdmin(message) {
   if (!sockGlobal) {
-    // console.log("[kirimKeAdmin] sockGlobal null, skip kirim");
     return;
   }
 
@@ -219,20 +204,12 @@ async function kirimKeAdmin(message) {
     .map((n) => n.trim())
     .filter(Boolean);
 
-  // console.log("[kirimKeAdmin] mengirim ke:", adminNumbers);
-
   for (const nomor of adminNumbers) {
     try {
       await sendTextMessage(sockGlobal, `${nomor}@lid`, message);
-      // console.log("[kirimKeAdmin] berhasil kirim ke", `${nomor}@lid`);
     } catch (e1) {
-      // console.log("[kirimKeAdmin] gagal @lid:", e1.message);
       try {
         await sendTextMessage(sockGlobal, `${nomor}@s.whatsapp.net`, message);
-        // console.log(
-        //   "[kirimKeAdmin] berhasil kirim ke",
-        //   `${nomor}@s.whatsapp.net`,
-        // );
       } catch (e2) {
         // console.log("[kirimKeAdmin] gagal @s.whatsapp.net:", e2.message);
       }
@@ -294,78 +271,10 @@ async function requireKaryawan(payload) {
   return { ok: true, karyawan: result.data };
 }
 
-// ====================================================================
-// !daftar
-// ====================================================================
-// async function processDaftarCommand(payload) {
-//   const text = normalizeText(payload?.text || "");
-
-//   const cek = await cariKaryawan(getSenderNumber(payload));
-//   if (cek.status === "ok") {
-//     return {
-//       status: "ok",
-//       message:
-//         "Nomor Anda sudah terdaftar. Gunakan !bantuan untuk melihat command yang tersedia.",
-//     };
-//   }
-
-//   const args = text
-//     .replace(/^!daftar\s*/i, "")
-//     .split(",")
-//     .map((p) => p.trim());
-//   if (args.length < 2 || !args[0] || !args[1]) {
-//     return {
-//       status: "error",
-//       message: "Format salah.\nContoh:\n!daftar Nama Kamu, Divisi Kamu",
-//     };
-//   }
-
-//   const [nama, ...divisiParts] = args;
-//   const divisi = divisiParts.join(", ").trim();
-//   const nomorWa = getSenderNumber(payload);
-
-//   // admin langsung terdaftar tanpa perlu approval
-//   if (isAdminSender(payload)) {
-//     const result = await daftarkanKaryawan(nomorWa, nama, divisi);
-//     if (result.status !== "ok") {
-//       return {
-//         status: "error",
-//         message: `Gagal mendaftarkan: ${result.message}`,
-//       };
-//     }
-//     return {
-//       status: "ok",
-//       message: `✅ Anda berhasil terdaftar.\nNama   : ${nama}\nDivisi : ${divisi}`,
-//     };
-//   }
-
-//   const result = await tambahPendaftaran(nomorWa, nama, divisi);
-//   if (result.status !== "ok") {
-//     return {
-//       status: "error",
-//       message: `Gagal mengirim permintaan: ${result.message}`,
-//     };
-//   }
-
-//   await kirimKeAdmin(
-//     `📋 *PERMINTAAN PENDAFTARAN*\n\nID Request : ${result.data.id}\nNomor      : ${nomorWa}\nNama       : ${nama}\nDivisi     : ${divisi}\n\nKetik *!setujui ${result.data.id}* untuk menyetujui.`,
-//   );
-
-//   return {
-//     status: "ok",
-//     message:
-//       "⏳ Permintaan pendaftaran terkirim. Mohon tunggu konfirmasi dari admin.",
-//   };
-// }
-
 async function processDaftarCommand(payload) {
   const text = normalizeText(payload?.text || "");
-  // console.log("[daftar] text:", text);
-  // console.log("[daftar] sender:", getSenderNumber(payload));
-  // console.log("[daftar] isAdmin:", isAdminSender(payload));
 
   const cek = await cariKaryawan(getSenderNumber(payload));
-  // console.log("[daftar] cek karyawan:", cek.status);
 
   if (cek.status === "ok") {
     return {
@@ -379,7 +288,6 @@ async function processDaftarCommand(payload) {
     .replace(/^!daftar\s*/i, "")
     .split(",")
     .map((p) => p.trim());
-  // console.log("[daftar] args:", args);
 
   if (args.length < 2 || !args[0] || !args[1]) {
     return {
@@ -394,7 +302,6 @@ async function processDaftarCommand(payload) {
   const jidAsli = getSenderJid(payload);
 
   if (isAdminSender(payload)) {
-    const jidAsli = getSenderJid(payload);
     const result = await daftarkanKaryawan(nomorWa, jidAsli, nama, divisi);
     if (result.status !== "ok") {
       return {
@@ -519,7 +426,7 @@ async function processDaftarKaryawanCommand(parsed, payload) {
     };
   }
 
-  const result = await daftarkanKaryawan(nomorPolos, nama, divisi);
+  const result = await daftarkanKaryawan(nomorPolos, "", nama, divisi);
   if (result.status !== "ok")
     return {
       status: "error",
@@ -571,6 +478,7 @@ async function processSifTidakTentuCommand(parsed, payload) {
   const validasi = await requireKaryawan(payload);
   if (!validasi.ok) return { status: "error", message: validasi.message };
 
+  const tanggal = parsed.command === "!l3" ? yesterdayISO() : todayISO();
   return await simpanLemburDanBalas({
     nama: validasi.karyawan.nama,
     divisi: validasi.karyawan.divisi,
@@ -606,6 +514,7 @@ async function processSifMingguanCommand(commandKey, payload) {
   }
 
   const jadwal = JADWAL_MINGGUAN[commandKey];
+  const tanggal = commandKey === "!m3" ? yesterdayISO() : todayISO();
   return await simpanLemburDanBalas({
     nama: validasi.karyawan.nama,
     divisi: validasi.karyawan.divisi,
@@ -718,16 +627,22 @@ async function processRekapCommand(parsedRekap, payload) {
     if (result.status !== "ok")
       return { status: result.status, message: result.message };
 
+    const tampilId = isAdminActive(payload);
     return {
       status: "ok",
-      message: buildRekapMessage(result.data || [], tanggalAwal, tanggalAkhir),
+      message: buildRekapMessage(
+        result.data || [],
+        tanggalAwal,
+        tanggalAkhir,
+        tampilId,
+      ),
     };
   } catch (error) {
     return { status: "error", message: error.message };
   }
 }
 
-function buildRekapMessage(items, tanggalAwal, tanggalAkhir) {
+function buildRekapMessage(items, tanggalAwal, tanggalAkhir, tampilId = false) {
   if (!items || items.length === 0)
     return "Belum ada data lembur pada periode ini.";
 
@@ -752,8 +667,8 @@ function buildRekapMessage(items, tanggalAwal, tanggalAkhir) {
   const periodeHeader = `REKAP LEMBUR ${formatDateIndo(tanggalAwal)} - ${formatDateIndo(tanggalAkhir)}`;
 
   const baris = items.map((item, idx) => {
-    const tagLibur = item.is_libur ? " [LIBUR]" : "";
-    return `${idx + 1}. ${formatDateIndo(item.tanggal)}_${formatJamTitik(item.jam_mulai)}-${formatJamTitik(item.jam_selesai)}_${Number(item.total_jam || 0)} Jam_${item.uraian_pekerjaan}${tagLibur}`;
+    const tagId = tampilId ? ` [ID:${item.id}]` : "";
+    return `${idx + 1}. ${formatDateIndo(item.tanggal)}_${formatJamTitik(item.jam_mulai)}-${formatJamTitik(item.jam_selesai)}_${Number(item.total_jam || 0)} Jam_${item.uraian_pekerjaan}${tagId}`;
   });
 
   const lines = [

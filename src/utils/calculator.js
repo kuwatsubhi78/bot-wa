@@ -8,9 +8,16 @@ function hitungLembur(jamMulai, jamSelesai, isLibur = false) {
 
   const mulai = mulaiJam * 60 + mulaiMenit;
   const selesai = selesaiJam * 60 + selesaiMenit;
-  const diffMenit = selesai - mulai;
-
+  // kalau selesai <= mulai, berarti melewati tengah malam
+  // contoh: 22:00 - 01:00 = 3 jam (bukan negatif)
+  let diffMenit = selesai - mulai;
   if (diffMenit <= 0) {
+    diffMenit += 24 * 60;
+  }
+
+  // batas wajar lembur maksimal 12 jam
+  // kalau lebih dari itu kemungkinan input salah, bukan lintas malam
+  if (diffMenit > 12 * 60) {
     return {
       totalJam: 0,
       tarifPerJam: TARIF_PER_JAM,

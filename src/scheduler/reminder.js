@@ -5,6 +5,7 @@ const {
   ambilLemburPeriodeSemua,
   getPeriodRange,
   getPeriodForDate,
+  ambilJidKaryawan,
 } = require("../services/lemburService");
 const { formatReminderMessage } = require("../utils/formatter");
 
@@ -57,8 +58,29 @@ async function runReminderForDate(targetDate, sock) {
     const items = grouped[nomorWA] || [];
     const message = formatReminderMessage(items, tanggalAwal, tanggalAkhir);
 
-    if (sock && nomorWA) {
-      await sendTextMessage(sock, nomorWA, message);
+    if (!sock || !nomorWA) continue;
+
+    // coba pakai jid yang tersimpan di tabel karyawan
+    const jid = await ambilJidKaryawan(nomorWA);
+
+    if (jid && jid.includes("@")) {
+      try {
+        await sendTextMessage(sock, jid, message);
+        continue;
+      } catch {
+        // jid gagal, fallback ke format manual
+      }
+    }
+
+    // fallback — coba @lid dulu, lalu @s.whatsapp.net
+    try {
+      await sendTextMessage(sock, `${nomorWA}@lid`, message);
+    } catch {
+      try {
+        await sendTextMessage(sock, `${nomorWA}@s.whatsapp.net`, message);
+      } catch (e) {
+        console.error(`[Reminder] Gagal kirim ke ${nomorWA}:`, e.message);
+      }
     }
   }
 
