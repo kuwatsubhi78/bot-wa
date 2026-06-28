@@ -239,6 +239,7 @@ async function cariKaryawan(nomorWa) {
 }
 
 async function daftarkanKaryawan(nomorWa, jid, nama, divisi) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
   const nomorPolos = String(nomorWa)
     .replace(/@.*$/, "")
     .replace(/:.*$/, "")
@@ -311,6 +312,7 @@ async function updateLemburById(id, updateData) {
 }
 
 async function tambahPendaftaran(nomorWa, jid, nama, divisi) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
   const nomorPolos = String(nomorWa)
     .replace(/@.*$/, "")
     .replace(/:.*$/, "")

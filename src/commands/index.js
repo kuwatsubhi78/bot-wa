@@ -13,9 +13,7 @@ function extractMessageText(message) {
 }
 
 // ====================================================================
-// Rate limiting per pengirim — cegah spam command beruntun
-// Maksimal 5 command per 10 detik. Setelah itu, kirim warning sekali,
-// lalu diam selama 15 detik sebelum mau warning lagi.
+// Rate limiting per pengirim
 // ====================================================================
 const RATE_LIMIT_MAX = 5;
 const RATE_LIMIT_WINDOW_MS = 10_000;
@@ -43,6 +41,42 @@ function isRateLimited(remoteJid) {
   return true;
 }
 
+// ====================================================================
+// Handler pesan — dipakai oleh registerCommands dan re-register
+// ====================================================================
+async function handleMessage(sock, msg) {
+  try {
+    if (!msg.message || msg.key?.fromMe) return;
+
+    const remoteJid = msg.key?.remoteJid;
+    const text = extractMessageText(msg.message).trim();
+
+    if (!remoteJid || !text || !text.startsWith("!")) return;
+
+    const limited = isRateLimited(remoteJid);
+    if (limited === true) return;
+    if (limited === "warn") {
+      await sendTextMessage(
+        sock,
+        remoteJid,
+        "⚠️ Terlalu banyak perintah dalam waktu singkat. Tunggu beberapa detik sebelum mencoba lagi.",
+      );
+      return;
+    }
+
+    const result = await handleLemburCommand({ text, sender: remoteJid });
+    if (result?.message) {
+      await sendTextMessage(sock, remoteJid, result.message);
+    }
+  } catch (error) {
+    console.error("Gagal memproses pesan:", error);
+  }
+}
+
+// ====================================================================
+// registerCommands — bisa dipanggil ulang dengan sock baru
+// setiap kali reconnect terjadi
+// ====================================================================
 function registerCommands(sock) {
   if (!sock || !sock.ev) {
     console.log("Commands belum bisa didaftarkan, sock tidak tersedia.");
@@ -53,33 +87,7 @@ function registerCommands(sock) {
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     for (const msg of messages || []) {
-      try {
-        if (!msg.message || msg.key?.fromMe) continue;
-
-        const remoteJid = msg.key?.remoteJid;
-        const text = extractMessageText(msg.message).trim();
-        // Bot hanya merespons pesan yang diawali "!"
-        // Berlaku sama di chat pribadi maupun grup WA
-        if (!remoteJid || !text || !text.startsWith("!")) continue;
-
-        const limited = isRateLimited(remoteJid);
-        if (limited === true) continue;
-        if (limited === "warn") {
-          await sendTextMessage(
-            sock,
-            remoteJid,
-            "⚠️ Terlalu banyak perintah dalam waktu singkat. Tunggu beberapa detik sebelum mencoba lagi.",
-          );
-          continue;
-        }
-
-        const result = await handleLemburCommand({ text, sender: remoteJid });
-        if (result?.message) {
-          await sendTextMessage(sock, remoteJid, result.message);
-        }
-      } catch (error) {
-        console.error("Gagal memproses pesan:", error);
-      }
+      await handleMessage(sock, msg);
     }
   });
 

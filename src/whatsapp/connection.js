@@ -18,7 +18,7 @@ let reconnectTimer = null;
 let isConnecting = false;
 
 const RECONNECT_DELAY = 5000;
-const QR_SCAN_TIMEOUT = 5 * 60 * 1000;
+const QR_SCAN_TIMEOUT = 3 * 60 * 1000;
 
 let qrTimeoutTimer = null;
 
@@ -42,7 +42,7 @@ function startHealthCheck() {
         scheduleReconnect("Health check gagal");
       }
     },
-    2 * 60 * 1000,
+    5 * 60 * 1000,
   );
 }
 
@@ -242,7 +242,7 @@ async function connectWhatsApp() {
             clearInterval(check);
             reject(new Error("Timeout menunggu reconnect selesai"));
           },
-          2 * 60 * 1000,
+          5 * 60 * 1000,
         );
       });
     }

@@ -7,7 +7,7 @@ const { initScheduler } = require("./src/scheduler/reminder");
 const { startQrServer } = require("./src/server/qrServer");
 
 // ====================================================================
-// Retry loop tanpa batas — bot tidak boleh mati di Northflank free
+// Retry loop tanpa batas — bot tidak boleh mati di Northflank
 // ====================================================================
 async function connectWithRetry() {
   let attempt = 0;
@@ -18,7 +18,7 @@ async function connectWithRetry() {
       const sock = await connectWhatsApp();
       return sock;
     } catch (err) {
-      const delay = Math.min(5000 * attempt, 30000); // backoff maks 30 detik
+      const delay = Math.min(5000 * attempt, 30000);
       console.log(`[Main] Gagal connect: ${err.message}`);
       console.log(`[Main] Coba lagi dalam ${delay / 1000} detik...`);
       await new Promise((r) => setTimeout(r, delay));
@@ -26,26 +26,41 @@ async function connectWithRetry() {
   }
 }
 
-async function main() {
-  console.log("=== BOT LEMBUR BERJALAN ===");
-
+// ====================================================================
+// Loop utama — reconnect dan re-register commands setiap kali
+// koneksi WA terputus dan tersambung kembali
+// ====================================================================
+async function startBot() {
   initSupabase();
   startQrServer(process.env.PORT || 3000);
-
-  const sock = await connectWithRetry();
-
-  registerCommands(sock);
   initScheduler();
 
-  setInterval(
-    () => {
-      console.log("[Main] Bot masih hidup ✓");
-    },
-    1000 * 60 * 30,
-  );
+  while (true) {
+    try {
+      console.log("[Main] Menghubungkan ke WhatsApp...");
+      const sock = await connectWithRetry();
+
+      // Register commands dengan sock yang baru — ini penting
+      // supaya listener messages.upsert selalu pakai sock aktif
+      registerCommands(sock);
+      console.log("[Main] Bot siap menerima pesan.");
+
+      // Tunggu sampai sock ini mati (disconnect)
+      await new Promise((resolve) => {
+        sock.ev.on("connection.update", ({ connection }) => {
+          if (connection === "close") {
+            console.log("[Main] Koneksi terputus, akan reconnect...");
+            resolve();
+          }
+        });
+      });
+    } catch (err) {
+      console.error("[Main] Error tak terduga:", err.message);
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
 }
 
-main().catch((error) => {
-  console.error("[Main] Error tak terduga:", error.message);
-  // Tidak process.exit — biarkan platform restart sendiri jika perlu
+startBot().catch((error) => {
+  console.error("[Main] Error fatal:", error.message);
 });
