@@ -22,8 +22,24 @@ function setConnected() {
 // ====================================================================
 function startQrServer(port) {
   const server = http.createServer(async (req, res) => {
+    // ----------------------------------------------------------------
+    // /health — untuk Northflank health check
+    // ----------------------------------------------------------------
+    if (req.url === "/health") {
+      if (isConnected) {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "ok", connected: true }));
+      } else {
+        res.writeHead(503, { "Content-Type": "application/json" });
+        res.end(JSON.stringify({ status: "not_connected", connected: false }));
+      }
+      return;
+    }
+
+    // ----------------------------------------------------------------
+    // /qr — halaman scan QR
+    // ----------------------------------------------------------------
     if (req.url === "/" || req.url === "/qr") {
-      // Sudah konek
       if (isConnected) {
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end(`
@@ -40,7 +56,6 @@ function startQrServer(port) {
         return;
       }
 
-      // Belum ada QR
       if (!latestQR) {
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end(`
@@ -58,7 +73,6 @@ function startQrServer(port) {
         return;
       }
 
-      // Ada QR, tampilkan
       try {
         const dataUrl = await QRCode.toDataURL(latestQR, { width: 400 });
         res.writeHead(200, { "Content-Type": "text/html" });
@@ -83,6 +97,9 @@ function startQrServer(port) {
       return;
     }
 
+    // ----------------------------------------------------------------
+    // Default
+    // ----------------------------------------------------------------
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("Bot lembur berjalan.");
   });

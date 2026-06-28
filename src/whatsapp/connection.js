@@ -18,9 +18,40 @@ let reconnectTimer = null;
 let isConnecting = false;
 
 const RECONNECT_DELAY = 5000;
-const QR_SCAN_TIMEOUT = 3 * 60 * 1000;
+const QR_SCAN_TIMEOUT = 5 * 60 * 1000;
 
 let qrTimeoutTimer = null;
+
+// ====================================================================
+// Health check — kirim ping ke WA server setiap 2 menit
+// Mencegah koneksi zombie setelah idle lama
+// ====================================================================
+let healthCheckTimer = null;
+
+function startHealthCheck() {
+  stopHealthCheck();
+  healthCheckTimer = setInterval(
+    async () => {
+      if (!sock?.user?.id) return;
+      try {
+        await sock.sendPresenceUpdate("available");
+      } catch (err) {
+        console.log("[WA] Health check gagal, reconnect...", err.message);
+        sock = null;
+        isConnecting = false;
+        scheduleReconnect("Health check gagal");
+      }
+    },
+    2 * 60 * 1000,
+  );
+}
+
+function stopHealthCheck() {
+  if (healthCheckTimer) {
+    clearInterval(healthCheckTimer);
+    healthCheckTimer = null;
+  }
+}
 
 // ====================================================================
 // Helpers
@@ -56,7 +87,6 @@ function scheduleReconnect(label) {
   }
 }
 
-// Hapus folder auth_info_baileys agar QR muncul lagi
 function clearAuthSession() {
   const authDir = path.resolve("auth_info_baileys");
   try {
@@ -146,6 +176,7 @@ async function connectWhatsApp() {
         isConnecting = false;
         console.log("[WA] WhatsApp Connected ✓");
         setConnected();
+        startHealthCheck();
         resolve(sock);
       }
 
@@ -155,13 +186,13 @@ async function connectWhatsApp() {
       if (connection === "close") {
         console.log(`[WA] WhatsApp Disconnected — statusCode: ${statusCode}`);
         clearQrTimeout();
+        stopHealthCheck();
 
         const isLoggedOut = statusCode === DisconnectReason.loggedOut;
         const isReplaced = statusCode === DisconnectReason.connectionReplaced;
         const isRestartRequired = statusCode === 515;
 
         if (isLoggedOut) {
-          // Hapus sesi lama lalu reconnect otomatis — tidak perlu restart pod
           console.log(
             "[WA] Sesi tidak valid (401/logout) — hapus sesi dan minta QR baru...",
           );
