@@ -15,6 +15,8 @@ const {
   parseEditCommand,
   processEdit,
   processDataku,
+  setKirimKeKaryawan,
+  processRekapKaryawan,
 } = require("./handlers/rekapHandler");
 const {
   setSock: setAdminSock,
@@ -26,7 +28,10 @@ const {
   processDaftarKaryawan,
   processKode,
   processExport,
+  kirimKeKaryawan,
 } = require("./handlers/adminHandler");
+
+setKirimKeKaryawan(kirimKeKaryawan);
 
 const ALIAS_MENU = [
   "!halo",
@@ -80,6 +85,7 @@ function buildMenuMessage(isAdmin, payload = null) {
       "!setujui [id]",
       "!hapus [id]                  — hapus data lembur siapapun",
       "!edit [id], jam, uraian      — edit data lembur siapapun",
+      "!rekapkaryawan nama [bulan] [tahun] — lihat rekap karyawan lain",
       "!export [bulan] [tahun]      — export CSV rekap semua karyawan",
     );
   }
@@ -191,6 +197,17 @@ async function handleLemburCommand(payload) {
   // ---- !dataku ----
   if (lower === "!dataku") {
     return await processDataku(payload);
+  }
+
+  // ---- !rekapkaryawan ----
+  if (lower.startsWith("!rekapkaryawan")) {
+    if (!isAdminActive(payload)) {
+      return {
+        status: "error",
+        message: "Aktifkan mode admin dulu dengan *!adminon [kode]*",
+      };
+    }
+    return await processRekapKaryawan(payload);
   }
 
   // ---- !kode ----

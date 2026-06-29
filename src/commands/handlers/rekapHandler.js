@@ -1,5 +1,4 @@
-const { TARIF_PER_JAM } = require("../../utils/calculator");
-const { hitungLembur } = require("../../utils/calculator");
+const { TARIF_PER_JAM, hitungLembur } = require("../../utils/calculator");
 const {
   formatCurrency,
   normalizeText,
@@ -13,10 +12,21 @@ const {
   getPeriodRange,
   getPeriodForDate,
   simpanAuditLog,
+  cariKaryawanByNama,
 } = require("../../services/lemburService");
 const { getSenderNumber, isAdminActive } = require("../utils/senderHelper");
 const { nowWIB } = require("../utils/dateHelper");
 const { splitJamRange, formatJamTitik } = require("../utils/jamHelper");
+
+// import kirimKeKaryawan dari adminHandler untuk kirim notif
+let _kirimKeKaryawan = null;
+function setKirimKeKaryawan(fn) {
+  _kirimKeKaryawan = fn;
+}
+
+async function kirimNotifKaryawan(nomor, message) {
+  if (_kirimKeKaryawan) await _kirimKeKaryawan(nomor, message);
+}
 
 function buildRekapMessage(items, tanggalAwal, tanggalAkhir, tampilId = false) {
   if (!items || items.length === 0)
@@ -44,7 +54,8 @@ function buildRekapMessage(items, tanggalAwal, tanggalAkhir, tampilId = false) {
 
   const baris = items.map((item, idx) => {
     const tagId = tampilId ? ` [ID:${item.id}]` : "";
-    return `${idx + 1}. ${formatDateIndo(item.tanggal)}_${formatJamTitik(item.jam_mulai)}-${formatJamTitik(item.jam_selesai)}_${Number(item.total_jam || 0)} Jam_${item.uraian_pekerjaan}${tagId}`;
+    const tagLibur = item.is_libur ? " (L)" : "";
+    return `${idx + 1}. ${formatDateIndo(item.tanggal)}_${formatJamTitik(item.jam_mulai)}-${formatJamTitik(item.jam_selesai)}_${Number(item.total_jam || 0)} Jam_${item.uraian_pekerjaan}${tagLibur}${tagId}`;
   });
 
   const lines = [
@@ -117,6 +128,132 @@ async function processRekap(parsedRekap, payload) {
   }
 }
 
+async function processDataku(payload) {
+  try {
+    const nomorWA = getSenderNumber(payload);
+    const now = nowWIB();
+    const periodForNow = getPeriodForDate(now);
+    const { tanggalAwal, tanggalAkhir } = getPeriodRange(
+      periodForNow.periodeBulan,
+      periodForNow.periodeTahun,
+    );
+
+    const result = await ambilLemburPeriode(
+      nomorWA,
+      periodForNow.periodeBulan,
+      periodForNow.periodeTahun,
+    );
+
+    if (result.status !== "ok")
+      return { status: result.status, message: result.message };
+
+    return {
+      status: "ok",
+      message: buildRekapMessage(
+        result.data || [],
+        tanggalAwal,
+        tanggalAkhir,
+        true,
+      ),
+    };
+  } catch (error) {
+    return { status: "error", message: error.message };
+  }
+}
+
+async function processRekapKaryawan(payload) {
+  try {
+    const text = normalizeText(payload?.text || "");
+    const rawArgs = text.replace(/^!rekapkaryawan\s*/i, "").trim();
+
+    if (!rawArgs) {
+      return {
+        status: "error",
+        message:
+          "Format salah.\nContoh:\n!rekapkaryawan Budi\n!rekapkaryawan Budi 6 2026",
+      };
+    }
+
+    const bagian = rawArgs.split(/\s+/);
+    let nama, bulan, tahun;
+
+    const dua = bagian.slice(-2);
+    if (dua.length === 2 && !isNaN(dua[0]) && !isNaN(dua[1])) {
+      nama = bagian.slice(0, -2).join(" ").trim();
+      bulan = Number(dua[0]);
+      tahun = Number(dua[1]);
+    } else {
+      nama = rawArgs;
+      bulan = null;
+      tahun = null;
+    }
+
+    if (!nama) {
+      return {
+        status: "error",
+        message: "Nama tidak boleh kosong.\nContoh:\n!rekapkaryawan Budi",
+      };
+    }
+
+    const cariResult = await cariKaryawanByNama(nama);
+
+    if (cariResult.status === "not_found") {
+      return {
+        status: "error",
+        message: `Karyawan dengan nama "${nama}" tidak ditemukan.`,
+      };
+    }
+    if (cariResult.status !== "ok") {
+      return {
+        status: "error",
+        message: `Gagal mencari karyawan: ${cariResult.message}`,
+      };
+    }
+
+    if (cariResult.data.length > 1) {
+      const daftar = cariResult.data
+        .map((k, i) => `${i + 1}. ${k.nama} (${k.divisi})`)
+        .join("\n");
+      return {
+        status: "ok",
+        message: `Ditemukan ${cariResult.data.length} karyawan dengan nama "${nama}":\n\n${daftar}\n\nKetik nama lebih lengkap untuk mempersempit hasil.`,
+      };
+    }
+
+    const karyawan = cariResult.data[0];
+    const now = nowWIB();
+    const periodForNow = getPeriodForDate(now);
+
+    const selectedBulan = bulan || periodForNow.periodeBulan;
+    const selectedTahun = tahun || periodForNow.periodeTahun;
+
+    const { tanggalAwal, tanggalAkhir } = getPeriodRange(
+      selectedBulan,
+      selectedTahun,
+    );
+    const result = await ambilLemburPeriode(
+      karyawan.nomor_wa,
+      selectedBulan,
+      selectedTahun,
+    );
+
+    if (result.status !== "ok")
+      return { status: result.status, message: result.message };
+
+    return {
+      status: "ok",
+      message: buildRekapMessage(
+        result.data || [],
+        tanggalAwal,
+        tanggalAkhir,
+        true,
+      ),
+    };
+  } catch (error) {
+    return { status: "error", message: error.message };
+  }
+}
+
 function parseHapusCommand(input) {
   const match = normalizeText(input).match(/^!hapus\s+(\d+)\s*$/i);
   if (!match) return null;
@@ -153,7 +290,6 @@ async function processHapus(parsed, payload) {
   if (result.status !== "ok")
     return { status: "error", message: `Gagal menghapus: ${result.message}` };
 
-  // catat audit log
   await simpanAuditLog(
     "hapus",
     getSenderNumber(payload),
@@ -161,6 +297,15 @@ async function processHapus(parsed, payload) {
     existing.data,
     null,
   );
+
+  // notif ke karyawan kalau yang hapus bukan diri sendiri (admin)
+  const pelaku = getSenderNumber(payload);
+  if (pelaku !== String(existing.data.nomor_wa)) {
+    await kirimNotifKaryawan(
+      existing.data.nomor_wa,
+      `⚠️ *Data lembur kamu dihapus oleh admin.*\n\nData yang dihapus:\nTanggal  : ${formatDateIndo(existing.data.tanggal)}\nJam      : ${formatJamTitik(existing.data.jam_mulai)}-${formatJamTitik(existing.data.jam_selesai)}\nUraian   : ${existing.data.uraian_pekerjaan}\nTotal    : ${formatCurrency(existing.data.total_diterima)}\n\nHubungi admin jika ada pertanyaan.`,
+    );
+  }
 
   return {
     status: "ok",
@@ -228,7 +373,7 @@ async function processEdit(parsed, payload) {
   if (hasil.totalJam <= 0)
     return { status: "error", message: "Jam selesai harus setelah jam mulai." };
 
-  const result = await updateLemburById(id, {
+  const dataBaru = {
     jam_mulai: jamRange.jamMulai,
     jam_selesai: jamRange.jamSelesai,
     uraian_pekerjaan: uraianPekerjaan,
@@ -237,12 +382,12 @@ async function processEdit(parsed, payload) {
     uang_lembur: hasil.uangLembur,
     uang_makan: hasil.uangMakan,
     total_diterima: hasil.totalDiterima,
-  });
+  };
 
+  const result = await updateLemburById(id, dataBaru);
   if (result.status !== "ok")
     return { status: "error", message: `Gagal mengupdate: ${result.message}` };
 
-  // catat audit log
   await simpanAuditLog(
     "edit",
     getSenderNumber(payload),
@@ -250,6 +395,15 @@ async function processEdit(parsed, payload) {
     existing.data,
     dataBaru,
   );
+
+  // notif ke karyawan kalau yang edit bukan diri sendiri (admin)
+  const pelaku = getSenderNumber(payload);
+  if (pelaku !== String(existing.data.nomor_wa)) {
+    await kirimNotifKaryawan(
+      existing.data.nomor_wa,
+      `⚠️ *Data lembur kamu diubah oleh admin.*\n\nSebelum:\nJam    : ${formatJamTitik(existing.data.jam_mulai)}-${formatJamTitik(existing.data.jam_selesai)}\nUraian : ${existing.data.uraian_pekerjaan}\nTotal  : ${formatCurrency(existing.data.total_diterima)}\n\nSesudah:\nJam    : ${formatJamTitik(jamRange.jamMulai)}-${formatJamTitik(jamRange.jamSelesai)}\nUraian : ${uraianPekerjaan}\nTotal  : ${formatCurrency(hasil.totalDiterima)}\n\nHubungi admin jika ada pertanyaan.`,
+    );
+  }
 
   return {
     status: "ok",
@@ -264,41 +418,8 @@ async function processEdit(parsed, payload) {
   };
 }
 
-async function processDataku(payload) {
-  try {
-    const nomorWA = getSenderNumber(payload);
-    const now = nowWIB();
-    const periodForNow = getPeriodForDate(now);
-    const { tanggalAwal, tanggalAkhir } = getPeriodRange(
-      periodForNow.periodeBulan,
-      periodForNow.periodeTahun,
-    );
-
-    const result = await ambilLemburPeriode(
-      nomorWA,
-      periodForNow.periodeBulan,
-      periodForNow.periodeTahun,
-    );
-
-    if (result.status !== "ok")
-      return { status: result.status, message: result.message };
-
-    // selalu tampilkan ID — ini khusus untuk karyawan kelola datanya sendiri
-    return {
-      status: "ok",
-      message: buildRekapMessage(
-        result.data || [],
-        tanggalAwal,
-        tanggalAkhir,
-        true,
-      ),
-    };
-  } catch (error) {
-    return { status: "error", message: error.message };
-  }
-}
-
 module.exports = {
+  setKirimKeKaryawan,
   parseRekapCommand,
   processRekap,
   parseHapusCommand,
@@ -306,4 +427,5 @@ module.exports = {
   parseEditCommand,
   processEdit,
   processDataku,
+  processRekapKaryawan,
 };

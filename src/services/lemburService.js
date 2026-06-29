@@ -411,6 +411,21 @@ async function cariKodePekerjaan(input) {
   return { status: "ok", data: cocok };
 }
 
+async function cariKaryawanByNama(nama) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const { data, error } = await supabase
+    .from("karyawan")
+    .select("*")
+    .ilike("nama", `%${nama}%`)
+    .order("nama", { ascending: true });
+
+  if (error) return { status: "error", message: error.message };
+  if (!data || data.length === 0) return { status: "not_found" };
+
+  return { status: "ok", data };
+}
+
 async function simpanAuditLog(
   aksi,
   pelaku,
@@ -450,5 +465,6 @@ module.exports = {
   updateStatusPendaftaran,
   ambilJidKaryawan,
   cariKodePekerjaan,
+  cariKaryawanByNama,
   simpanAuditLog,
 };

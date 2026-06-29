@@ -392,4 +392,5 @@ module.exports = {
   processDaftarKaryawan,
   processKode,
   processExport,
+  kirimKeKaryawan,
 };
