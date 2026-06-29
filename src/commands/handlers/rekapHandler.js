@@ -12,6 +12,7 @@ const {
   updateLemburById,
   getPeriodRange,
   getPeriodForDate,
+  simpanAuditLog,
 } = require("../../services/lemburService");
 const { getSenderNumber, isAdminActive } = require("../utils/senderHelper");
 const { nowWIB } = require("../utils/dateHelper");
@@ -152,6 +153,15 @@ async function processHapus(parsed, payload) {
   if (result.status !== "ok")
     return { status: "error", message: `Gagal menghapus: ${result.message}` };
 
+  // catat audit log
+  await simpanAuditLog(
+    "hapus",
+    getSenderNumber(payload),
+    id,
+    existing.data,
+    null,
+  );
+
   return {
     status: "ok",
     message: `✅ Data lembur dengan ID ${id} berhasil dihapus.`,
@@ -231,6 +241,15 @@ async function processEdit(parsed, payload) {
 
   if (result.status !== "ok")
     return { status: "error", message: `Gagal mengupdate: ${result.message}` };
+
+  // catat audit log
+  await simpanAuditLog(
+    "edit",
+    getSenderNumber(payload),
+    id,
+    existing.data,
+    dataBaru,
+  );
 
   return {
     status: "ok",

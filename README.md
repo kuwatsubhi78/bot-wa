@@ -26,6 +26,7 @@ Bot WhatsApp untuk mencatat dan merekap lembur karyawan pabrik sistem 3 sif.
 - `!lembur` — lihat rekap lembur periode 18–17
 - `!lembur [bulan] [tahun]` — lihat rekap lembur periode 18–17 dalam periode tertentu
 - `!kode` — lihat daftar kode pekerjaan
+- `!dataku` — lihat rekap dengan ID (untuk hapus/edit)
 - `!hapus [id]` — hapus data lembur
 - `!edit [id], jam, uraian` — edit data lembur
 - `!bantuan` — tampilkan menu

@@ -411,6 +411,26 @@ async function cariKodePekerjaan(input) {
   return { status: "ok", data: cocok };
 }
 
+async function simpanAuditLog(
+  aksi,
+  pelaku,
+  lemburId,
+  dataLama,
+  dataBaru = null,
+) {
+  if (!supabase) return;
+
+  await supabase.from("audit_log").insert([
+    {
+      aksi,
+      dilakukan_oleh: pelaku,
+      lembur_id: lemburId,
+      data_lama: dataLama,
+      data_baru: dataBaru,
+    },
+  ]);
+}
+
 module.exports = {
   tambahLembur,
   ambilLemburBulanan,
@@ -430,4 +450,5 @@ module.exports = {
   updateStatusPendaftaran,
   ambilJidKaryawan,
   cariKodePekerjaan,
+  simpanAuditLog,
 };
