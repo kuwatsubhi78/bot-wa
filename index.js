@@ -1,18 +1,12 @@
 require("dotenv").config();
 
-const { initSupabase } = require("./src/config/supabase");
+const { initSupabase, supabase } = require("./src/config/supabase");
 const { connectWhatsApp } = require("./src/whatsapp/connection");
 const { registerCommands } = require("./src/commands");
 const { initScheduler } = require("./src/scheduler/reminder");
 const { startQrServer } = require("./src/server/qrServer");
-const { preloadSemua } = require(".//src/state");
+const { preloadSemua } = require("./src/state");
 
-// Preload dulu, baru start bot
-await preloadSemua(supabase);
-
-// ====================================================================
-// Retry loop tanpa batas — bot tidak boleh mati di Northflank
-// ====================================================================
 async function connectWithRetry() {
   let attempt = 0;
   while (true) {
@@ -30,12 +24,14 @@ async function connectWithRetry() {
   }
 }
 
-// ====================================================================
-// Loop utama — reconnect dan re-register commands setiap kali
-// koneksi WA terputus dan tersambung kembali
-// ====================================================================
 async function startBot() {
+  // 1. Init supabase dulu
   initSupabase();
+
+  // 2. Baru preload — supabase sudah siap
+  await preloadSemua(supabase);
+
+  // 3. Start server & scheduler
   startQrServer(process.env.PORT || 3000);
   initScheduler();
 
@@ -44,12 +40,9 @@ async function startBot() {
       console.log("[Main] Menghubungkan ke WhatsApp...");
       const sock = await connectWithRetry();
 
-      // Register commands dengan sock yang baru — ini penting
-      // supaya listener messages.upsert selalu pakai sock aktif
       registerCommands(sock);
       console.log("[Main] Bot siap menerima pesan.");
 
-      // Tunggu sampai sock ini mati (disconnect)
       await new Promise((resolve) => {
         sock.ev.on("connection.update", ({ connection }) => {
           if (connection === "close") {
