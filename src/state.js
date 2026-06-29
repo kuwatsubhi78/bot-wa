@@ -9,7 +9,7 @@ export async function preloadSemua(supabase) {
       .from("kode_pekerjaan")
       .select("*")
       .order("kode", { ascending: true }),
-    supabase.from("profil_karyawan").select("*"),
+    supabase.from("karyawan").select("*"),
   ]);
 
   if (kode.error)
