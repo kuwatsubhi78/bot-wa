@@ -245,6 +245,40 @@ async function processEdit(parsed, payload) {
   };
 }
 
+async function processDataku(payload) {
+  try {
+    const nomorWA = getSenderNumber(payload);
+    const now = nowWIB();
+    const periodForNow = getPeriodForDate(now);
+    const { tanggalAwal, tanggalAkhir } = getPeriodRange(
+      periodForNow.periodeBulan,
+      periodForNow.periodeTahun,
+    );
+
+    const result = await ambilLemburPeriode(
+      nomorWA,
+      periodForNow.periodeBulan,
+      periodForNow.periodeTahun,
+    );
+
+    if (result.status !== "ok")
+      return { status: result.status, message: result.message };
+
+    // selalu tampilkan ID — ini khusus untuk karyawan kelola datanya sendiri
+    return {
+      status: "ok",
+      message: buildRekapMessage(
+        result.data || [],
+        tanggalAwal,
+        tanggalAkhir,
+        true,
+      ),
+    };
+  } catch (error) {
+    return { status: "error", message: error.message };
+  }
+}
+
 module.exports = {
   parseRekapCommand,
   processRekap,
@@ -252,4 +286,5 @@ module.exports = {
   processHapus,
   parseEditCommand,
   processEdit,
+  processDataku,
 };

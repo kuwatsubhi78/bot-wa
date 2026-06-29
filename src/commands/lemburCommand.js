@@ -14,6 +14,7 @@ const {
   processHapus,
   parseEditCommand,
   processEdit,
+  processDataku,
 } = require("./handlers/rekapHandler");
 const {
   setSock: setAdminSock,
@@ -55,7 +56,9 @@ function buildMenuMessage(isAdmin, payload = null) {
     "!m3 uraian                   — lembur mingguan tetap (Sif 3, tanggal kemarin)",
     "",
     "*Lihat Data*",
-    "!lembur [bulan] [tahun]      — rekap lembur periode 18-17",
+    "!lembur                      — rekap lembur periode 18-17",
+    "!lembur [bulan] [tahun]      — rekap lembur periode 18-17 dalam periode tertentu",
+    "!dataku                      — lihat rekap dengan ID (untuk hapus/edit)",
     "!kode                        — daftar uraian pekerjaan",
     "",
     "*Kelola Data*",
@@ -183,6 +186,11 @@ async function handleLemburCommand(payload) {
       status: "error",
       message: "Format salah.\nContoh:\n!lembur\n!lembur 6 2026",
     };
+  }
+
+  // ---- !dataku ----
+  if (lower === "!dataku") {
+    return await processDataku(payload);
   }
 
   // ---- !kode ----
