@@ -56,6 +56,11 @@ function buildMenuMessage(isAdmin, payload = null) {
     "",
     "*Lihat Data*",
     "!lembur [bulan] [tahun]      — rekap lembur periode 18-17",
+    "!kode                        — daftar uraian pekerjaan",
+    "",
+    "*Kelola Data*",
+    "!hapus [id]                  — hapus data lembur milikmu",
+    "!edit [id], jam, uraian      — edit data lembur milikmu",
     "",
     "!bantuan                     — tampilkan menu ini",
   ];
@@ -70,9 +75,8 @@ function buildMenuMessage(isAdmin, payload = null) {
       "!adminoff                    — nonaktifkan mode admin",
       "!daftarkaryawan nomor, nama, divisi",
       "!setujui [id]",
-      "!kode",
-      "!hapus [id]",
-      "!edit [id], jam, uraian",
+      "!hapus [id]                  — hapus data lembur siapapun",
+      "!edit [id], jam, uraian      — edit data lembur siapapun",
       "!export [bulan] [tahun]      — export CSV rekap semua karyawan",
     );
   }
@@ -183,11 +187,6 @@ async function handleLemburCommand(payload) {
 
   // ---- !kode ----
   if (lower === "!kode") {
-    if (!isAdminActive(payload))
-      return {
-        status: "error",
-        message: "Aktifkan mode admin dulu dengan *!adminon [kode]*",
-      };
     return await processKode();
   }
 
