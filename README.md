@@ -40,6 +40,7 @@ Bot WhatsApp untuk mencatat dan merekap lembur karyawan pabrik sistem 3 sif.
 - `!kode` — lihat daftar kode pekerjaan
 - `!hapus [id]` — hapus data lembur
 - `!edit [id], jam, uraian` — edit data lembur
+- `!rekapkaryawan nama [bulan] [tahun]` — lihat rekap karyawan lain
 - `!export [bulan] [tahun]` — export CSV rekap semua karyawan
 
 ---
