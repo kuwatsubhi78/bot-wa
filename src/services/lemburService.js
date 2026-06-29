@@ -1,4 +1,5 @@
 const { supabase } = require("../config/supabase");
+const { state } = require("../state");
 
 function toDateString(date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -221,12 +222,17 @@ async function ambilRekapTahunan(nomorWA, tahun) {
 async function cariKaryawan(nomorWa) {
   if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
 
-  // strip suffix apapun sebelum lookup
   const nomorPolos = String(nomorWa)
     .replace(/@.*$/, "")
     .replace(/:.*$/, "")
     .trim();
 
+  // 1. Cek state dulu (hasil preload)
+  if (state.profilKaryawan[nomorPolos]) {
+    return { status: "ok", data: state.profilKaryawan[nomorPolos] };
+  }
+
+  // 2. Tidak ada di state → query Supabase
   const { data, error } = await supabase
     .from("karyawan")
     .select("*")
@@ -235,11 +241,16 @@ async function cariKaryawan(nomorWa) {
 
   if (error) return { status: "error", message: error.message };
   if (!data) return { status: "not_found" };
+
+  // 3. Simpan ke state supaya berikutnya tidak query lagi
+  state.profilKaryawan[nomorPolos] = data;
+
   return { status: "ok", data };
 }
 
 async function daftarkanKaryawan(nomorWa, jid, nama, divisi) {
   if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
   const nomorPolos = String(nomorWa)
     .replace(/@.*$/, "")
     .replace(/:.*$/, "")
@@ -254,6 +265,10 @@ async function daftarkanKaryawan(nomorWa, jid, nama, divisi) {
     .single();
 
   if (error) return { status: "error", message: error.message };
+
+  // Update state langsung supaya sinkron tanpa perlu query ulang
+  state.profilKaryawan[nomorPolos] = data;
+
   return { status: "ok", data };
 }
 

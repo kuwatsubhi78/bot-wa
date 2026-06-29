@@ -5,6 +5,10 @@ const { connectWhatsApp } = require("./src/whatsapp/connection");
 const { registerCommands } = require("./src/commands");
 const { initScheduler } = require("./src/scheduler/reminder");
 const { startQrServer } = require("./src/server/qrServer");
+const { preloadSemua } = require(".//src/state");
+
+// Preload dulu, baru start bot
+await preloadSemua(supabase);
 
 // ====================================================================
 // Retry loop tanpa batas — bot tidak boleh mati di Northflank
