@@ -85,7 +85,7 @@ async function simpanLemburDanBalas({
     `Jam Lembur       : ${formatJamTitik(jamMulai)}-${formatJamTitik(jamSelesai)}`,
   ];
 
-  if (isLibur) lines.push(`Catatan          : Lembur hari libur`);
+  // if (isLibur) lines.push(`Catatan          : Lembur hari libur`);
 
   lines.push(
     "",
