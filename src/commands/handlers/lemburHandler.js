@@ -4,7 +4,11 @@ const {
   normalizeText,
   formatDateIndo,
 } = require("../../utils/formatter");
-const { tambahLembur, cariKaryawan } = require("../../services/lemburService");
+const {
+  tambahLembur,
+  cariKaryawan,
+  cariKodePekerjaan,
+} = require("../../services/lemburService");
 const { getSenderNumber } = require("../utils/senderHelper");
 const { todayISO, yesterdayISO } = require("../utils/dateHelper");
 const { splitJamRange, formatJamTitik } = require("../utils/jamHelper");
@@ -36,6 +40,26 @@ async function requireKaryawan(payload) {
     };
 
   return { ok: true, karyawan: result.data };
+}
+
+async function validasiUraian(uraian) {
+  const result = await cariKodePekerjaan(uraian);
+
+  if (result.status === "skipped") return { ok: true, uraianFinal: uraian }; // skip validasi kalau supabase belum siap
+  if (result.status === "error") return { ok: true, uraianFinal: uraian }; // skip validasi kalau error
+
+  if (result.status === "not_found") {
+    const daftar = (result.semua || [])
+      .map((i) => `${i.kode}. ${i.deskripsi}`)
+      .join("\n");
+    return {
+      ok: false,
+      message: `Uraian pekerjaan tidak dikenali.\n\nDaftar yang valid:\n${daftar}\n\nContoh:\n!m1 slitting\n!m1 1`,
+    };
+  }
+
+  // pakai deskripsi resmi, bukan input user
+  return { ok: true, uraianFinal: result.data.deskripsi };
 }
 
 async function simpanLemburDanBalas({
@@ -129,6 +153,9 @@ async function processSifTidakTentu(parsed, payload) {
   const validasi = await requireKaryawan(payload);
   if (!validasi.ok) return { status: "error", message: validasi.message };
 
+  const validasiU = await validasiUraian(parsed.uraianPekerjaan);
+  if (!validasiU.ok) return { status: "error", message: validasiU.message };
+
   const tanggal = parsed.command === "!l3" ? yesterdayISO() : todayISO();
   return await simpanLemburDanBalas({
     nama: validasi.karyawan.nama,
@@ -160,6 +187,9 @@ async function processSifMingguan(commandKey, payload) {
       message: `Format salah.\nContoh:\n${commandKey} slitting`,
     };
   }
+
+  const validasiU = await validasiUraian(parsed.uraian);
+  if (!validasiU.ok) return { status: "error", message: validasiU.message };
 
   const jadwal = JADWAL_MINGGUAN[commandKey];
   const tanggal = commandKey === "!m3" ? yesterdayISO() : todayISO();

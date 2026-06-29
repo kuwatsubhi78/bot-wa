@@ -371,6 +371,31 @@ async function ambilJidKaryawan(nomorWa) {
   return data?.jid || null;
 }
 
+async function cariKodePekerjaan(input) {
+  if (!supabase) return { status: "skipped", message: "Supabase belum siap." };
+
+  const inputBersih = String(input || "")
+    .trim()
+    .toLowerCase();
+
+  const { data, error } = await supabase
+    .from("kode_pekerjaan")
+    .select("*")
+    .order("kode", { ascending: true });
+
+  if (error) return { status: "error", message: error.message };
+
+  // cocokkan dengan kode (angka) atau deskripsi (teks)
+  const cocok = (data || []).find(
+    (item) =>
+      item.kode.toLowerCase() === inputBersih ||
+      item.deskripsi.toLowerCase() === inputBersih,
+  );
+
+  if (!cocok) return { status: "not_found", semua: data || [] };
+  return { status: "ok", data: cocok };
+}
+
 module.exports = {
   tambahLembur,
   ambilLemburBulanan,
@@ -389,4 +414,5 @@ module.exports = {
   ambilPendaftaranById,
   updateStatusPendaftaran,
   ambilJidKaryawan,
+  cariKodePekerjaan,
 };
