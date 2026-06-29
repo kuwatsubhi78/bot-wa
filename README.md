@@ -23,7 +23,8 @@ Bot WhatsApp untuk mencatat dan merekap lembur karyawan pabrik sistem 3 sif.
 - `!m1 uraian` — catat lembur mingguan tetap, Sif 1 (12:00–14:00)
 - `!m2 uraian` — catat lembur mingguan tetap, Sif 2 (20:00–22:00)
 - `!m3 uraian` — catat lembur mingguan tetap, Sif 3 (04:00–06:00, tanggal kemarin)
-- `!lembur [bulan] [tahun]` — lihat rekap lembur periode 18–17
+- `!lembur` — lihat rekap lembur periode 18–17
+- `!lembur [bulan] [tahun]` — lihat rekap lembur periode 18–17 dalam periode tertentu
 - `!kode` — lihat daftar kode pekerjaan
 - `!hapus [id]` — hapus data lembur
 - `!edit [id], jam, uraian` — edit data lembur
